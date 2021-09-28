@@ -26,10 +26,11 @@ static ssize_t name##_read(struct file *file, struct kobject *kobj,		\
 			   struct bin_attribute *attr, char *buf,		\
 			   loff_t off, size_t count)				\
 {										\
-	struct device *dev = kobj_to_dev(kobj);                                 \
+	struct device *dev = kobj_to_dev(kobj);					\
 										\
-	return cpumap_print_bitmask_to_buf(buf, topology_##mask(dev->id),	\
-					   off, count);                         \
+	ssize_t n = cpumap_print_bitmask_to_buf(buf, topology_##mask(dev->id),	\
+						off, count);			\
+	return n>0?n-1:n;							\
 }										\
 										\
 static ssize_t name##_list_read(struct file *file, struct kobject *kobj,	\
@@ -38,8 +39,9 @@ static ssize_t name##_list_read(struct file *file, struct kobject *kobj,	\
 {										\
 	struct device *dev = kobj_to_dev(kobj);					\
 										\
-	return cpumap_print_list_to_buf(buf, topology_##mask(dev->id),		\
-					off, count);				\
+	ssize_t n = cpumap_print_list_to_buf(buf, topology_##mask(dev->id),	\
+					     off, count);			\
+	return n>0?n-1:n;							\
 }
 
 define_id_show_func(physical_package_id);
