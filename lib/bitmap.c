@@ -492,6 +492,8 @@ EXPORT_SYMBOL(bitmap_print_to_pagebuf);
  * @list: indicates whether the bitmap must be list
  *      true:  print in decimal list format
  *      false: print in hexadecimal bitmask format
+ * Returns the number of characters actually printed to @buf,
+ * excluding terminating '\0'.
  */
 static int bitmap_print_to_buf(bool list, char *buf, const unsigned long *maskp,
 		int nmaskbits, loff_t off, size_t count)
@@ -504,9 +506,8 @@ static int bitmap_print_to_buf(bool list, char *buf, const unsigned long *maskp,
 	if (!data)
 		return -ENOMEM;
 
-	size = memory_read_from_buffer(buf, count, &off, data, strlen(data) + 1);
+	size = memory_read_from_buffer(buf, count, &off, data, strlen(data));
 	kfree(data);
-
 	return size;
 }
 
