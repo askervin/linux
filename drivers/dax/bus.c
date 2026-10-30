@@ -3,6 +3,7 @@
 #include <linux/memremap.h>
 #include <linux/device.h>
 #include <linux/mutex.h>
+#include <linux/sched/signal.h>
 #include <linux/list.h>
 #include <linux/slab.h>
 #include <linux/dax.h>
@@ -719,14 +720,17 @@ static struct dev_dax_range *get_dax_range(struct device *dev)
 {
 	struct dax_mapping *mapping = to_dax_mapping(dev);
 	struct dev_dax *dev_dax = to_dev_dax(dev->parent);
-	int rc;
 
-	rc = down_write_killable(&dax_region_rwsem);
-	if (rc)
-		return NULL;
+	/*
+	 * Mapping removal drains this attribute with dax_region_rwsem held.
+	 * Restart the read on contention to release the kernfs active
+	 * reference without waiting for the rwsem.
+	 */
+	if (!down_write_trylock(&dax_region_rwsem))
+		return ERR_PTR(restart_syscall());
 	if (mapping->range_id < 0) {
 		up_write(&dax_region_rwsem);
-		return NULL;
+		return ERR_PTR(-ENXIO);
 	}
 
 	return &dev_dax->ranges[mapping->range_id];
@@ -744,8 +748,8 @@ static ssize_t start_show(struct device *dev,
 	ssize_t rc;
 
 	dax_range = get_dax_range(dev);
-	if (!dax_range)
-		return -ENXIO;
+	if (IS_ERR(dax_range))
+		return PTR_ERR(dax_range);
 	rc = sysfs_emit(buf, "%#llx\n", dax_range->range.start);
 	put_dax_range();
 
@@ -760,8 +764,8 @@ static ssize_t end_show(struct device *dev,
 	ssize_t rc;
 
 	dax_range = get_dax_range(dev);
-	if (!dax_range)
-		return -ENXIO;
+	if (IS_ERR(dax_range))
+		return PTR_ERR(dax_range);
 	rc = sysfs_emit(buf, "%#llx\n", dax_range->range.end);
 	put_dax_range();
 
@@ -776,8 +780,8 @@ static ssize_t pgoff_show(struct device *dev,
 	ssize_t rc;
 
 	dax_range = get_dax_range(dev);
-	if (!dax_range)
-		return -ENXIO;
+	if (IS_ERR(dax_range))
+		return PTR_ERR(dax_range);
 	rc = sysfs_emit(buf, "%#lx\n", dax_range->pgoff);
 	put_dax_range();
 
