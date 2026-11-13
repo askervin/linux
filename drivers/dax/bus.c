@@ -468,12 +468,18 @@ static void unregister_dev_dax(void *dev)
 
 	dev_dbg(dev, "%s\n", __func__);
 
-	down_write(&dax_region_rwsem);
 	kill_dev_dax(dev_dax);
+	/*
+	 * Drain the attributes of the device before taking
+	 * dax_region_rwsem: size_store(), mapping_store() and align_store()
+	 * wait for the rwsem while they hold the active reference of their
+	 * attribute, and device_del() waits for that reference to be dropped.
+	 */
 	device_del(dev);
+	down_write(&dax_region_rwsem);
 	free_dev_dax_ranges(dev_dax);
-	put_device(dev);
 	up_write(&dax_region_rwsem);
+	put_device(dev);
 }
 
 static void dax_region_free(struct kref *kref)
